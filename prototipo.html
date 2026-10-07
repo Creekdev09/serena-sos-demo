@@ -845,8 +845,15 @@ button{cursor:pointer}
       if(!got){got=true;axes.hidden=false;diag.hidden=false;diag.textContent='Sensor: '+src+' · '+Math.round(1000/Math.max(e.interval||16,1))+' lecturas/s';msg('Sensor listo. Agita el celular con fuerza.')}
       lvl.style.width=Math.min(m/30,1)*100+'%';axis('shkX',x);axis('shkY',y);axis('shkZ',z);
       var t=Date.now();
-      if(m>thr){peaks.push(t);if(t-lastBuzz>250){lastBuzz=t;vibrate(40)}}
-      peaks=peaks.filter(function(p){return t-p<1000});
+      if(m>thr){
+        if(t-lastBuzz>250){lastBuzz=t;vibrate(40)}
+        // cuenta sacudidas, no lecturas: un pico nuevo exige que el eje dominante cambie de sentido
+        // (un golpe único, como dejar el celular en la mesa, empuja en un solo sentido)
+        var ax=Math.abs(x)>=Math.abs(y)&&Math.abs(x)>=Math.abs(z)?'x':(Math.abs(y)>=Math.abs(z)?'y':'z');
+        var sg=({x:x,y:y,z:z})[ax]>0?1:-1, lp=peaks[peaks.length-1];
+        if(!lp||(lp.ax===ax&&lp.sg!==sg&&t-lp.t>=60)||(lp.ax!==ax&&t-lp.t>=120))peaks.push({t:t,ax:ax,sg:sg});
+      }
+      peaks=peaks.filter(function(p){return t-p.t<1200});
       if(peaks.length>=3&&t-last>3000){last=t;fire()}
     }
     function listen(){
@@ -863,7 +870,7 @@ button{cursor:pointer}
       } else listen();
     }
     function stop(keepMsg){window.removeEventListener('devicemotion',onMotion);on=false;clearTimeout(noT);clearInterval(fakeT);hero.classList.remove('go');lvl.style.width='0';btn.disabled=false;btn.textContent='Activar sensor';if(!keepMsg)msg('Toca "Activar sensor" para empezar.')}
-    function fire(){stop(true);hero.classList.add('go');msg('¡Sacudida detectada!');vibrate([300,100,300]);setTimeout(function(){hero.classList.remove('go');if(cur==='sacudida')startSim()},700)}
+    function fire(){stop(true);vibrate(0);hero.classList.add('go');msg('¡Sacudida detectada!');vibrate([300,100,300]);setTimeout(function(){hero.classList.remove('go');if(cur==='sacudida')startSim()},700)}
     function fake(){voice.unlock();stop(true);hero.classList.add('go');msg('Sacudiendo…');var p=0;clearInterval(fakeT);
       fakeT=setInterval(function(){p+=.12;lvl.style.width=Math.min(p,1)*100+'%';if(p>=1){clearInterval(fakeT);fire()}},70)}
     btn.addEventListener('click',start); $('shkFake').addEventListener('click',fake);
