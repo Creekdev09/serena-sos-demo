@@ -276,6 +276,7 @@ button{cursor:pointer}
 .axes .ax i{position:absolute;top:0;bottom:0;left:50%;width:0;background:var(--accent)}
 .axes output{text-align:right;font-variant-numeric:tabular-nums}
 .shk-diag{font-size:.75em;color:var(--fg2);text-align:center}
+.shk-why{background:none;border:0;color:var(--fg2);font:inherit;font-size:.75em;text-decoration:underline;min-height:44px;padding:0 12px}
 @media (prefers-reduced-motion: reduce){.shaking,.shk-hero.go svg,.vbar.on .wave i{animation:none}.splash.run .load i{animation-duration:.01s}}
 
 </style>
@@ -407,6 +408,7 @@ button{cursor:pointer}
           <p class="shk-status" id="shkStatus" role="status">Toca "Activar sensor" para empezar.</p>
           <div class="force"><div class="bar" aria-hidden="true"><i id="shkLvl"></i><b id="shkThr" style="left:50%"></b></div><div class="lb"><span>Quieto</span><span>Fuerza de la sacudida</span><span>Fuerte</span></div></div>
           <div class="axes" id="shkAxes" hidden aria-hidden="true"><span>X</span><span class="ax"><i id="shkX"></i></span><output id="shkXv">0</output><span>Y</span><span class="ax"><i id="shkY"></i></span><output id="shkYv">0</output><span>Z</span><span class="ax"><i id="shkZ"></i></span><output id="shkZv">0</output></div>
+          <button class="shk-why" id="shkWhy" hidden aria-expanded="false">Ver detalle</button>
           <p class="shk-diag" id="shkDiag" hidden></p>
         </div>
         <p class="h3">Sensibilidad</p>
@@ -839,7 +841,7 @@ button{cursor:pointer}
     var on=false, got=false, peaks=[], thr=15, noT=null, last=0, fakeT=null, grav=null, src='', lastBuzz=0;
     var st=$('shkStatus'), lvl=$('shkLvl'), hero=$('shkHero'), btn=$('shkStart'), axes=$('shkAxes'), diag=$('shkDiag');
     function msg(t){st.textContent=t}
-    function why(t){diag.hidden=false;diag.textContent='Detalle técnico: '+t}
+    function why(t){diag.hidden=true;diag.textContent='Detalle técnico: '+t;var w=$('shkWhy');w.hidden=false;w.setAttribute('aria-expanded','false')}
     function setThr(v){thr=v;$('shkThr').style.left=Math.min(v/30,1)*100+'%';all('[data-sens]').forEach(function(b){b.setAttribute('aria-pressed',String(+b.dataset.sens===v))})}
     function axis(id,v){var c=Math.max(-1,Math.min(1,v/20)),i=$(id);i.style.left=(c<0?50+c*50:50)+'%';i.style.width=Math.abs(c)*50+'%';$(id+'v').textContent=v.toFixed(1)}
     function onMotion(e){
@@ -867,7 +869,7 @@ button{cursor:pointer}
       if(peaks.length>=3&&t-last>3000){last=t;fire()}
     }
     function listen(){
-      window.addEventListener('devicemotion',onMotion); on=true; got=false; peaks=[]; grav=null; diag.hidden=true;
+      window.addEventListener('devicemotion',onMotion); on=true; got=false; peaks=[]; grav=null; diag.hidden=true; $('shkWhy').hidden=true;
       btn.textContent='Sensor activo'; btn.disabled=true; msg('Buscando el sensor de movimiento…');
       clearTimeout(noT); noT=setTimeout(function(){if(on&&!got){msg('No llegan datos del sensor. Usa "Simular sacudida".');why('el navegador no entrega lecturas (¿se abrió fuera de Chrome o Safari?)');stop(true)}},4000);
     }
@@ -884,6 +886,7 @@ button{cursor:pointer}
     function fake(){voice.unlock();stop(true);hero.classList.add('go');msg('Sacudiendo…');var p=0;clearInterval(fakeT);
       fakeT=setInterval(function(){p+=.12;lvl.style.width=Math.min(p,1)*100+'%';if(p>=1){clearInterval(fakeT);fire()}},70)}
     btn.addEventListener('click',start); $('shkFake').addEventListener('click',fake);
+    $('shkWhy').addEventListener('click',function(){var o=diag.hidden;diag.hidden=!o;this.setAttribute('aria-expanded',String(o))});
     all('[data-sens]').forEach(function(b){b.addEventListener('click',function(){setThr(+b.dataset.sens)})});
     setThr(15);
     return {stop:function(){if(on||fakeT)stop()}};
