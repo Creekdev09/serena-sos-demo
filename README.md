@@ -6,3 +6,7 @@ Prototipo de la app Serena S.O.S. (proyecto universitario, CIDE).
 - Versión para computador (teléfono + panel de demostración): `prototipo.html`.
 
 El simulacro por sacudida usa el acelerómetro del celular, que solo funciona desde una dirección https en Chrome (Android) o Safari (iPhone).
+
+## Créditos
+
+- Voz: Fernando, generada con [ElevenLabs](https://elevenlabs.io). Uso académico, no comercial.
