@@ -425,7 +425,7 @@ html[data-app="dark"]{--app-bg:#15121F}
         </div>
         <button class="btn pri" id="shkStart">Activar sensor</button>
         <button class="btn sec" id="shkFake">Simular sacudida (sin sensor)</button>
-        <p class="ex">El sensor solo funciona si la app se abre desde una dirección https en Chrome (Android) o Safari (iPhone, que pide permiso). Abierta como archivo descargado, dentro de WhatsApp o dentro de claude.ai, usa el botón "Simular sacudida".</p>
+        <p class="ex">Si el sensor no responde, usa "Simular sacudida".</p>
       </div>
     </section>
 
@@ -434,7 +434,7 @@ html[data-app="dark"]{--app-bg:#15121F}
       <div class="em-src"><span class="tag-sim">SIMULACRO</span><span>Fuente: SGC · <span class="t-now">12:04</span></span></div>
       <div class="em-body">
         <div class="vbar" data-vbar><span class="vic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></span><span class="vtxt"><span class="vlab"><span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span class="vst">Voz activa</span></span><span class="vcap">Simulacro. Alerta sísmica.</span></span><button class="vmute" data-mute>Silenciar</button></div>
-        <div class="lvl moderado"><svg viewBox="0 0 28 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M2 10h4l2-6 3 12 3-14 3 16 3-8h6"/></svg>Intensidad esperada: Moderada · Chapinero, a 210 km del epicentro</div>
+        <div class="lvl moderado"><svg viewBox="0 0 28 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M2 10h4l2-6 3 12 3-14 3 16 3-8h6"/></svg>Intensidad esperada: Moderado · Chapinero, a 210 km del epicentro</div>
         <div class="count" aria-live="assertive"><span class="n" id="cd">12</span><span class="l">segundos<br>para que llegue<br>el sismo</span></div>
         <p class="order" id="ordA">AGÁCHATE<br>CÚBRETE<br>SUJÉTATE</p>
         <div class="picto" aria-hidden="true">
@@ -442,7 +442,7 @@ html[data-app="dark"]{--app-bg:#15121F}
           <div><svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22h52M12 22v32M52 22v32"/><circle cx="26" cy="36" r="5" fill="#fff"/><path d="M30 40l10 4v8M24 42l-6 10"/></svg>Cúbrete</div>
           <div><svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14h52M44 14v42"/><path d="M22 40c4-6 10-8 18-8h4M22 48c6 0 14-2 22-4"/><path d="M14 44h8"/></svg>Sujétate</div>
         </div>
-        <p class="em-sub">Protégete donde estás. No salgas corriendo.</p>
+        <p class="em-sub">Protégete donde estás. Quédate protegido hasta que pare.</p>
         <div style="display:grid;gap:10px;margin-top:auto">
           <button class="btn em-ghost" data-replay>Repetir instrucciones</button>
         </div>
@@ -791,6 +791,7 @@ html[data-app="dark"]{--app-bg:#15121F}
     var on=false, got=false, peaks=[], thr=15, noT=null, last=0, fakeT=null, grav=null, src='', lastBuzz=0;
     var st=$('shkStatus'), lvl=$('shkLvl'), hero=$('shkHero'), btn=$('shkStart'), axes=$('shkAxes'), diag=$('shkDiag');
     function msg(t){st.textContent=t}
+    function why(t){diag.hidden=false;diag.textContent='Detalle técnico: '+t}
     function setThr(v){thr=v;$('shkThr').style.left=Math.min(v/30,1)*100+'%';all('[data-sens]').forEach(function(b){b.setAttribute('aria-pressed',String(+b.dataset.sens===v))})}
     function axis(id,v){var c=Math.max(-1,Math.min(1,v/20)),i=$(id);i.style.left=(c<0?50+c*50:50)+'%';i.style.width=Math.abs(c)*50+'%';$(id+'v').textContent=v.toFixed(1)}
     function onMotion(e){
@@ -818,13 +819,13 @@ html[data-app="dark"]{--app-bg:#15121F}
       if(peaks.length>=3&&t-last>3000){last=t;fire()}
     }
     function listen(){
-      window.addEventListener('devicemotion',onMotion); on=true; got=false; peaks=[]; grav=null;
+      window.addEventListener('devicemotion',onMotion); on=true; got=false; peaks=[]; grav=null; diag.hidden=true;
       btn.textContent='Sensor activo'; btn.disabled=true; msg('Buscando el sensor de movimiento…');
-      clearTimeout(noT); noT=setTimeout(function(){if(on&&!got){msg('El celular no está enviando datos del sensor. Abre la app desde el enlace https en Chrome o Safari, o usa "Simular sacudida".');stop(true)}},4000);
+      clearTimeout(noT); noT=setTimeout(function(){if(on&&!got){msg('No llegan datos del sensor. Usa "Simular sacudida".');why('el navegador no entrega lecturas (¿se abrió fuera de Chrome o Safari?)');stop(true)}},4000);
     }
     function start(){
       voice.unlock();
-      if(!window.isSecureContext){msg('Esta página no es segura (no es https), así que el celular bloquea el sensor. Ábrela desde el enlace https o usa "Simular sacudida".');return}
+      if(!window.isSecureContext){msg('Este celular no deja usar el sensor aquí. Usa "Simular sacudida".');why('la página no se abrió desde un enlace https');return}
       if(typeof DeviceMotionEvent==='undefined'){msg('Este navegador no tiene sensor de movimiento. Usa "Simular sacudida".');return}
       if(typeof DeviceMotionEvent.requestPermission==='function'){
         DeviceMotionEvent.requestPermission().then(function(p){if(p==='granted')listen();else msg('Sin permiso para el sensor. En iPhone: cierra la pestaña, vuelve a abrir la app y toca "Permitir".')},function(){msg('No se pudo pedir permiso al sensor. Usa "Simular sacudida".')});
