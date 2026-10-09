@@ -1,0 +1,31 @@
+# Arma el APK de Serena S.O.S. (app de usuarios) con Capacitor y lo publica como "release" descargable desde el celular.
+name: APK Android
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['index.html', 'apk/**', '.github/workflows/apk.yml']
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: apk } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - run: mkdir -p www && cp ../index.html www/index.html
+      - run: npm ci
+      - run: npx cap sync android
+      - run: cd android && ./gradlew assembleDebug --no-daemon
+      - run: cp android/app/build/outputs/apk/debug/app-debug.apk serena-sos.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: serena-sos-apk, path: apk/serena-sos.apk }
+      - name: Publicar descarga
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          TAG="apk-$(date -u +%Y%m%d-%H%M)"
+          gh release create "$TAG" serena-sos.apk --title "Serena S.O.S. APK $TAG" --notes "APK de prueba (sismos simulados). Instálalo en Android permitiendo apps de origen desconocido." --latest
