@@ -409,7 +409,7 @@ button{cursor:pointer}
       <div class="appbar"><button class="back" data-go="inicio" aria-label="Volver">←</button><span class="ttl">Simulacro por sacudida</span></div>
       <div class="scroll">
         <p class="h1">Agita el celular</p>
-        <p class="muted">Muévelo con fuerza durante un segundo. Cuando el sensor note la sacudida, llegará la alerta como si empezara un sismo.</p>
+        <p class="muted">Muévelo de un lado a otro, no hace falta fuerza. Cuando el sensor note la sacudida, llegará la alerta como si empezara un sismo.</p>
         <div class="shk-hero" id="shkHero">
           <svg viewBox="0 0 96 96" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="32" y="14" width="32" height="68" rx="7"/><path d="M44 72h8"/><path d="M20 34v28M76 34v28M10 40v16M86 40v16"/></svg>
           <p class="shk-status" id="shkStatus" role="status">Toca "Activar sensor" para empezar.</p>
@@ -420,9 +420,9 @@ button{cursor:pointer}
         </div>
         <p class="h3">Sensibilidad</p>
         <div class="seg3" role="group" aria-label="Sensibilidad del sensor">
-          <button data-sens="10" aria-pressed="false">Suave</button>
-          <button data-sens="15" aria-pressed="true">Normal</button>
-          <button data-sens="22" aria-pressed="false">Fuerte</button>
+          <button data-sens="4" aria-pressed="false">Suave</button>
+          <button data-sens="6" aria-pressed="true">Normal</button>
+          <button data-sens="10" aria-pressed="false">Fuerte</button>
         </div>
         <button class="btn pri" id="shkStart">Activar sensor</button>
         <button class="btn sec" id="shkFake">Simular sacudida (sin sensor)</button>
@@ -861,11 +861,11 @@ button{cursor:pointer}
 
   /* ---------- simulacro por sacudida ---------- */
   var shake=(function(){
-    var on=false, got=false, peaks=[], thr=15, noT=null, last=0, fakeT=null, grav=null, src='', lastBuzz=0;
+    var on=false, got=false, peaks=[], thr=6, noT=null, last=0, fakeT=null, grav=null, src='', lastBuzz=0;
     var st=$('shkStatus'), lvl=$('shkLvl'), hero=$('shkHero'), btn=$('shkStart'), axes=$('shkAxes'), diag=$('shkDiag');
     function msg(t){st.textContent=t}
     function why(t){diag.hidden=true;diag.textContent='Detalle técnico: '+t;var w=$('shkWhy');w.hidden=false;w.setAttribute('aria-expanded','false')}
-    function setThr(v){thr=v;$('shkThr').style.left=Math.min(v/30,1)*100+'%';all('[data-sens]').forEach(function(b){b.setAttribute('aria-pressed',String(+b.dataset.sens===v))})}
+    function setThr(v){thr=v;$('shkThr').style.left=Math.min(v/20,1)*100+'%';all('[data-sens]').forEach(function(b){b.setAttribute('aria-pressed',String(+b.dataset.sens===v))})}
     function axis(id,v){var c=Math.max(-1,Math.min(1,v/20)),i=$(id);i.style.left=(c<0?50+c*50:50)+'%';i.style.width=Math.abs(c)*50+'%';$(id+'v').textContent=v.toFixed(1)}
     function onMotion(e){
       var a=e.acceleration,g=e.accelerationIncludingGravity,x,y,z;
@@ -877,8 +877,8 @@ button{cursor:pointer}
         x=g.x-grav.x;y=g.y-grav.y;z=g.z-grav.z;src='gravedad filtrada'}
       else return;
       var m=Math.sqrt(x*x+y*y+z*z);
-      if(!got){got=true;axes.hidden=false;diag.hidden=false;diag.textContent='Sensor: '+src+' · '+Math.round(1000/Math.max(e.interval||16,1))+' lecturas/s';msg('Sensor listo. Agita el celular con fuerza.')}
-      lvl.style.width=Math.min(m/30,1)*100+'%';axis('shkX',x);axis('shkY',y);axis('shkZ',z);
+      if(!got){got=true;axes.hidden=false;diag.hidden=false;diag.textContent='Sensor: '+src+' · '+Math.round(1000/Math.max(e.interval||16,1))+' lecturas/s';msg('Sensor listo. Agita el celular.')}
+      lvl.style.width=Math.min(m/20,1)*100+'%';axis('shkX',x);axis('shkY',y);axis('shkZ',z);
       var t=Date.now();
       if(m>thr){
         if(t-lastBuzz>250){lastBuzz=t;vibrate(40)}
@@ -888,8 +888,9 @@ button{cursor:pointer}
         var sg=({x:x,y:y,z:z})[ax]>0?1:-1, lp=peaks[peaks.length-1];
         if(!lp||(lp.ax===ax&&lp.sg!==sg&&t-lp.t>=60)||(lp.ax!==ax&&t-lp.t>=120))peaks.push({t:t,ax:ax,sg:sg});
       }
-      peaks=peaks.filter(function(p){return t-p.t<1200});
-      if(peaks.length>=3&&t-last>3000){last=t;fire()}
+      peaks=peaks.filter(function(p){return t-p.t<1500});
+      // basta un vaivén (ida y vuelta) aunque sea suave: en esta pantalla la persona ya pidió el simulacro
+      if(peaks.length>=2&&t-last>3000){last=t;fire()}
     }
     function listen(){
       window.addEventListener('devicemotion',onMotion); on=true; got=false; peaks=[]; grav=null; diag.hidden=true; $('shkWhy').hidden=true;
@@ -911,7 +912,7 @@ button{cursor:pointer}
     btn.addEventListener('click',start); $('shkFake').addEventListener('click',fake);
     $('shkWhy').addEventListener('click',function(){var o=diag.hidden;diag.hidden=!o;this.setAttribute('aria-expanded',String(o))});
     all('[data-sens]').forEach(function(b){b.addEventListener('click',function(){setThr(+b.dataset.sens)})});
-    setThr(15);
+    setThr(6);
     return {stop:function(){if(on||fakeT)stop()}};
   })();
 
