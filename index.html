@@ -918,7 +918,11 @@ html[data-app="dark"]{--app-bg:#15121F}
   $('helpNo').addEventListener('click',function(){hc.hidden=true;hb.setAttribute('aria-expanded','false');hb.focus()});
   $('helpYes').addEventListener('click',function(){hc.hidden=true;hb.setAttribute('aria-expanded','false');vibrate([200,100,200]);
     $('helpVia').textContent='Enviado a 4 contactos con tu ubicación '+via()+' · '+now();
-    go('ayuda'); voice.play('ayuda',300); undoIn('ayuda',function(){go('despues')});});
+    go('ayuda'); voice.play('ayuda',300); pedido(true); undoIn('ayuda',function(){pedido(false);go('despues')});});
+  // el pedido queda en este navegador para que el portal de Rescate (mismo sitio) lo vea llegar
+  function pedido(on){try{var K='serena-sos-pedidos',a=JSON.parse(localStorage.getItem(K)||'[]');
+    if(on)a.push({id:'p'+Date.now(),nombre:state.user&&state.user.name||'Laura Gómez',via:state.off?'SMS':'App',salud:'Asma. Usa inhalador.'});else a.pop();
+    localStorage.setItem(K,JSON.stringify(a.slice(-5)))}catch(e){}}
   hb.addEventListener('contextmenu',function(e){e.preventDefault()});
   // copiar 123
   $('copy123').addEventListener('click',function(){var b=this;function ok(){b.textContent='Copiado'}
