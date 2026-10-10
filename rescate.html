@@ -393,7 +393,7 @@ dialog::backdrop{background:rgba(20,17,31,.55)}
   $('backBtn').onclick=function(){setView('list');var b=document.querySelector('.case[data-id="'+cur+'"]');if(b)b.focus()};
 
   /* ---------- detalle ---------- */
-  function open(id){
+  function open(id,quiet){
     cur=id;var c=byId(id);c.isNew=false;
     $('dEmpty').hidden=true;$('dCase').hidden=false;
     $('dTitle').textContent='Caso '+c.id+' · '+c.n+(c.edad?', '+c.edad+' años':'');
@@ -411,8 +411,8 @@ dialog::backdrop{background:rgba(20,17,31,.55)}
     $('dNote').value=c.note||'';
     $('dTl').innerHTML=c.tl.map(function(t){return '<li><time>'+(typeof t[0]==='number'?ago(t[0]):t[0])+'</time>'+esc(t[1])+'</li>'}).join('');
     render();
-    if(matchMedia('(max-width:1180px)').matches&&document.body.dataset.view!=='detail')setView(matchMedia('(max-width:720px)').matches?'detail':'list');
-    $('dTitle').focus({preventScroll:false});
+    if(!quiet&&matchMedia('(max-width:1180px)').matches&&document.body.dataset.view!=='detail')setView(matchMedia('(max-width:720px)').matches?'detail':'list');
+    if(!quiet)$('dTitle').focus({preventScroll:false});
   }
   function log(c,t){c.tl.unshift([stamp(),t+(off?' (pendiente de envío)':'')]);if(off)pending++}
   $('dActs').addEventListener('click',function(e){var b=e.target.closest('[data-act]');if(!b)return;var c=byId(cur),k=b.dataset.act;
@@ -421,10 +421,10 @@ dialog::backdrop{background:rgba(20,17,31,.55)}
     if(k==='liberar'){c.st='libre';log(c,me+' liberó el caso');c.team=null;snack('El caso '+c.id+' vuelve a la lista sin asignar.')}
     if(k==='reabrir'){c.st='libre';c.team=null;log(c,'Caso reabierto');snack('Caso '+c.id+' reabierto.')}
     if(k==='remitir'){openRem();return}
-    open(c.id)});
+    sync(c);open(c.id)});
   function openRem(){$('hList').innerHTML=HOSP.map(function(h,i){return '<li><label><input type="radio" name="hosp" value="'+h.id+'"'+(i===0?' checked':'')+'><span><b>'+esc(h.n)+'</b><br><span class="small muted">'+esc(h.cap)+'</span></span></label></li>'}).join('');$('remDlg').showModal()}
   $('remDlg').addEventListener('close',function(){if($('remDlg').returnValue!=='ok')return;var c=byId(cur),h=document.querySelector('[name=hosp]:checked'),H=HOSP.filter(function(x){return x.id===h.value})[0];
-    c.st='rem';log(c,'Remitido a '+H.n);snack('Caso '+c.id+' remitido a '+H.n+'.');open(c.id)});
+    c.st='rem';log(c,'Remitido a '+H.n);sync(c);snack('Caso '+c.id+' remitido a '+H.n+'.');open(c.id)});
   $('noteBtn').onclick=function(){var c=byId(cur),v=$('dNote').value.trim();if(!v)return;c.note=v;log(c,'Nota: '+v);snack(off?'Nota guardada. Se envía al volver la conexión.':'Nota guardada para el equipo.');open(c.id)};
   document.querySelectorAll('[data-contact]').forEach(function(b){b.onclick=function(){snack(b.dataset.contact==='llamar'?'En el prototipo no se hacen llamadas.':'En el prototipo no se envían SMS.')}});
 
@@ -435,13 +435,52 @@ dialog::backdrop{background:rgba(20,17,31,.55)}
   /* ---------- pedidos que llegan desde la app de usuarios (mismo sitio) ---------- */
   var KEY='serena-sos-pedidos',seen={};
   function pull(){var arr=[];try{arr=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){}
-    arr.forEach(function(r){if(seen[r.id])return;seen[r.id]=1;var id=CASES.length+1;
+    arr.forEach(function(r){if(seen[r.id]||CASES.some(function(c){return c.rid===r.id}))return;seen[r.id]=1;var id=CASES.length+1;
       CASES.push({id:id,n:r.nombre||'Laura Gómez',edad:r.edad,what:'Pidió ayuda desde la app (botón Necesito ayuda).',loc:r.loc||'Chapinero',dir:r.dir||'Ubicación aproximada enviada por la app',dist:r.dist||1.6,min:0,p:'alta',st:'libre',ppl:'1 persona',via:r.via||'App',health:{ok:!!r.salud,t:r.salud||''},x:390,y:150,isNew:true,rid:r.id,tl:[[stamp(),'Llegó el pedido por '+(r.via||'App')]]});
       $('liveNew').textContent='Nuevo pedido de ayuda: caso '+id+', '+(r.nombre||'Laura Gómez');snack('Nuevo pedido de ayuda: caso '+id+'.')});
     // si la persona deshizo el pedido en la app, el caso se cierra
-    var ids=arr.map(function(r){return r.id});CASES.forEach(function(c){if(c.rid&&ids.indexOf(c.rid)<0&&c.st==='libre'){c.st='cancel';c.isNew=false;c.tl.unshift([stamp(),'La persona canceló el pedido desde la app'])}});
+    var ids=arr.map(function(r){return r.id});CASES.forEach(function(c){if(c.rid&&!c.cloud&&ids.indexOf(c.rid)<0&&c.st==='libre'){c.st='cancel';c.isNew=false;c.tl.unshift([stamp(),'La persona canceló el pedido desde la app'])}});
     if(!$('app').hidden)render()}
   window.addEventListener('storage',function(e){if(e.key===KEY)pull()});
+
+  /* ---------- pedidos desde otros dispositivos (Firebase) ---------- */
+  /* Conexión con Firebase (Firestore) compartida por la app y el portal de Rescate.
+   Si no hay configuración o no hay internet, todo sigue funcionando en este navegador (localStorage). */
+var nube=(function(){
+  var CFG={"apiKey":"AIzaSyCU1WYlujwYIoqczCdVMwAgg-UbIkBJmDY","authDomain":"serena-sos.firebaseapp.com","projectId":"serena-sos","storageBucket":"serena-sos.firebasestorage.app","messagingSenderId":"541120929785","appId":"1:541120929785:web:02ab3e98149e12e4a42728"}, V='10.12.2', db=null, fs=null, ready=null;
+  function init(){
+    if(ready)return ready;
+    if(!CFG||!navigator.onLine||location.protocol==='file:')return ready=Promise.resolve(null);
+    ready=Promise.all([import('https://www.gstatic.com/firebasejs/'+V+'/firebase-app.js'),import('https://www.gstatic.com/firebasejs/'+V+'/firebase-firestore.js')])
+      .then(function(m){fs=m[1];db=fs.getFirestore(m[0].initializeApp(CFG));return db})
+      .catch(function(e){console.warn('Sin Firebase:',e);return null});
+    return ready}
+  return {
+    on:!!CFG,
+    // crea o actualiza un pedido con un id propio, para no duplicarlo con el respaldo local
+    guardar:function(id,datos){return init().then(function(d){if(!d)return false;
+      if(datos.creado===true)datos.creado=fs.serverTimestamp();
+      return fs.setDoc(fs.doc(d,'pedidos',id),datos,{merge:true}).then(function(){return true})}).catch(function(e){console.warn(e);return false})},
+    // escucha un pedido (app) o los de las últimas 24 h (portal)
+    uno:function(id,cb){init().then(function(d){if(d)fs.onSnapshot(fs.doc(d,'pedidos',id),function(s){if(s.exists())cb(s.data())})})},
+    todos:function(cb){init().then(function(d){if(!d)return;
+      var q=fs.query(fs.collection(d,'pedidos'),fs.where('creado','>',fs.Timestamp.fromMillis(Date.now()-864e5)),fs.orderBy('creado','desc'),fs.limit(50));
+      fs.onSnapshot(q,function(s){var a=[];s.forEach(function(x){var v=x.data();v.id=x.id;v.ms=v.creado&&v.creado.toMillis?v.creado.toMillis():Date.now();a.push(v)});cb(a)},function(e){console.warn(e)})})}
+  };
+})();
+
+  var nubeOn=false;
+  function addRemote(r){var id=CASES.length+1;seen[r.id]=1;
+    CASES.push({id:id,n:r.nombre||'Persona sin nombre',what:'Pidió ayuda desde la app (botón Necesito ayuda).',loc:r.loc||'Chapinero',dir:'Ubicación aproximada enviada por la app',dist:1.6,min:Math.max(0,(Date.now()-r.ms)/6e4),p:'alta',st:'libre',ppl:'1 persona',via:r.via||'App',health:{ok:!!r.salud,t:r.salud||''},x:390+((id*37)%120)-60,y:150+((id*53)%120)-60,isNew:true,rid:r.id,cloud:true,tl:[[stamp(),'Llegó el pedido por '+(r.via||'App')+(r.sim?' (simulacro)':'')]]});
+    $('liveNew').textContent='Nuevo pedido de ayuda: caso '+id+', '+(r.nombre||'');snack('Nuevo pedido de ayuda: caso '+id+'.');return CASES[id-1]}
+  nube.todos(function(arr){nubeOn=true;$('netTxt').textContent=off?'Sin conexión':'En línea · nube';
+    arr.slice().reverse().forEach(function(r){var c=CASES.filter(function(x){return x.rid===r.id})[0];
+      if(!c){if(r.estado==='cancel')return;c=addRemote(r)}
+      c.cloud=true;
+      // otro equipo pudo tomar o cerrar el caso: se refleja aquí
+      if(r.estado&&r.estado!==c.st){c.st=r.estado;c.team=r.equipo||c.team;c.isNew=false;c.tl.unshift([stamp(),r.estado==='cancel'?'La persona canceló el pedido desde la app':(EST[r.estado]?EST[r.estado][0]:r.estado)+(r.equipo?' · '+r.equipo:'')])}});
+    if(!$('app').hidden){render();if(cur)open(cur,true)}});
+  function sync(c){if(c.cloud&&c.rid)nube.guardar(c.rid,{estado:c.st,equipo:c.team||null})}
   setInterval(pull,3000);
   setInterval(function(){CASES.forEach(function(c){c.min+=1});if(!$('app').hidden)render()},60000);
 

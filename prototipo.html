@@ -518,7 +518,7 @@ button{cursor:pointer}
     <!-- AYUDA ENVIADA -->
     <section class="screen" data-s="ayuda" aria-label="Pedido de ayuda enviado" hidden>
       <div class="scroll">
-        <div class="card" style="background:var(--help);color:#fff" role="status"><b style="font-size:1.25em">Pediste ayuda</b><span id="helpVia">Enviado a 4 contactos con tu ubicación · 12:05</span><span class="undo-in" data-undo hidden><span data-undo-t>Puedes deshacerlo durante 10 s</span><button type="button">Deshacer</button></span></div>
+        <div class="card" style="background:var(--help);color:#fff" role="status"><b style="font-size:1.25em">Pediste ayuda</b><span id="helpVia">Enviado a 4 contactos con tu ubicación · 12:05</span><b id="rescueSt" hidden></b><span class="undo-in" data-undo hidden><span data-undo-t>Puedes deshacerlo durante 10 s</span><button type="button">Deshacer</button></span></div>
         <div class="callout"><b>Si hay heridos o atrapados, llama a la línea de emergencias</b>
           <div class="copy"><code>123</code><button class="btn sec" style="width:auto;min-height:44px" id="copy123">Copiar número</button></div>
           <span class="small muted">Serena no reemplaza la línea 123.</span></div>
@@ -957,8 +957,42 @@ button{cursor:pointer}
     $('helpVia').textContent='Enviado a 4 contactos con tu ubicación '+via()+' · '+now();
     go('ayuda'); voice.play('ayuda',300); pedido(true); undoIn('ayuda',function(){pedido(false);go('despues')});});
   // el pedido queda en este navegador para que el portal de Rescate (mismo sitio) lo vea llegar
-  function pedido(on){try{var K='serena-sos-pedidos',a=JSON.parse(localStorage.getItem(K)||'[]');
-    if(on)a.push({id:'p'+Date.now(),nombre:state.user&&state.user.name||'Laura Gómez',via:state.off?'SMS':'App',salud:'Asma. Usa inhalador.'});else a.pop();
+  // y, si hay internet, también en Firebase para que lo vea Rescate desde otro dispositivo
+  /* Conexión con Firebase (Firestore) compartida por la app y el portal de Rescate.
+   Si no hay configuración o no hay internet, todo sigue funcionando en este navegador (localStorage). */
+var nube=(function(){
+  var CFG={"apiKey":"AIzaSyCU1WYlujwYIoqczCdVMwAgg-UbIkBJmDY","authDomain":"serena-sos.firebaseapp.com","projectId":"serena-sos","storageBucket":"serena-sos.firebasestorage.app","messagingSenderId":"541120929785","appId":"1:541120929785:web:02ab3e98149e12e4a42728"}, V='10.12.2', db=null, fs=null, ready=null;
+  function init(){
+    if(ready)return ready;
+    if(!CFG||!navigator.onLine||location.protocol==='file:')return ready=Promise.resolve(null);
+    ready=Promise.all([import('https://www.gstatic.com/firebasejs/'+V+'/firebase-app.js'),import('https://www.gstatic.com/firebasejs/'+V+'/firebase-firestore.js')])
+      .then(function(m){fs=m[1];db=fs.getFirestore(m[0].initializeApp(CFG));return db})
+      .catch(function(e){console.warn('Sin Firebase:',e);return null});
+    return ready}
+  return {
+    on:!!CFG,
+    // crea o actualiza un pedido con un id propio, para no duplicarlo con el respaldo local
+    guardar:function(id,datos){return init().then(function(d){if(!d)return false;
+      if(datos.creado===true)datos.creado=fs.serverTimestamp();
+      return fs.setDoc(fs.doc(d,'pedidos',id),datos,{merge:true}).then(function(){return true})}).catch(function(e){console.warn(e);return false})},
+    // escucha un pedido (app) o los de las últimas 24 h (portal)
+    uno:function(id,cb){init().then(function(d){if(d)fs.onSnapshot(fs.doc(d,'pedidos',id),function(s){if(s.exists())cb(s.data())})})},
+    todos:function(cb){init().then(function(d){if(!d)return;
+      var q=fs.query(fs.collection(d,'pedidos'),fs.where('creado','>',fs.Timestamp.fromMillis(Date.now()-864e5)),fs.orderBy('creado','desc'),fs.limit(50));
+      fs.onSnapshot(q,function(s){var a=[];s.forEach(function(x){var v=x.data();v.id=x.id;v.ms=v.creado&&v.creado.toMillis?v.creado.toMillis():Date.now();a.push(v)});cb(a)},function(e){console.warn(e)})})}
+  };
+})();
+
+  var pedidoId=null;
+  function pedido(on){var rs=$('rescueSt');
+    try{var K='serena-sos-pedidos',a=JSON.parse(localStorage.getItem(K)||'[]');
+    if(on){pedidoId='p'+Date.now()+Math.random().toString(36).slice(2,6);
+      var d={nombre:state.user&&state.user.name||'Laura Gómez',via:state.off?'SMS':'App',salud:'Asma. Usa inhalador.',loc:'Chapinero',estado:'libre',sim:!!state.sim};
+      a.push(Object.assign({id:pedidoId},d));
+      if(!state.off)nube.guardar(pedidoId,Object.assign({creado:true},d)).then(function(ok){if(ok)nube.uno(pedidoId,function(v){
+        if(cur!=='ayuda')return; var t={camino:(v.equipo||'Un equipo')+' tomó tu caso: van en camino.',ok:'Tu caso quedó como atendido.',rem:'Te remitieron a un hospital.'}[v.estado];
+        if(t){rs.textContent=t;rs.hidden=false;showSnack(t)}})});
+    }else{a=a.filter(function(r){return r.id!==pedidoId});if(pedidoId)nube.guardar(pedidoId,{estado:'cancel'});pedidoId=null;rs.hidden=true}
     localStorage.setItem(K,JSON.stringify(a.slice(-5)))}catch(e){}}
   hb.addEventListener('contextmenu',function(e){e.preventDefault()});
   // copiar 123
