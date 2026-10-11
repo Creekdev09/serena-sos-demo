@@ -228,7 +228,18 @@ button{cursor:pointer}
 .steps li{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border-radius:14px;padding:12px 14px;counter-increment:s}
 .steps li::before{content:counter(s);flex:none;width:28px;height:28px;border-radius:99px;background:var(--surface2);color:var(--fg);font-weight:700;display:grid;place-items:center;font-size:.85em}
 .callout{background:var(--surface);border:2px solid var(--help);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:6px}
-.copy{display:flex;gap:8px;align-items:center}
+.call123{background:var(--help);color:#fff;font-size:1.1em;min-height:56px;text-decoration:none}
+/* espera del pedido de ayuda y unidad en camino */
+.wait{background:var(--surface);border:2px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.wait .row1{display:flex;gap:10px;align-items:center}
+.pulse{width:14px;height:14px;border-radius:50%;background:var(--help);flex:none;box-shadow:0 0 0 0 rgba(196,43,28,.5)}
+@media (prefers-reduced-motion:no-preference){.pulse{animation:pulse 1.6s infinite}}
+@keyframes pulse{70%{box-shadow:0 0 0 12px rgba(196,43,28,0)}100%{box-shadow:0 0 0 0 rgba(196,43,28,0)}}
+.unit{display:flex;gap:10px;align-items:center}
+.unit .ic{width:44px;height:44px;border-radius:12px;background:#1D4ED8;color:#fff;display:grid;place-items:center;flex:none}
+.wmap{height:190px;border-radius:12px;overflow:hidden;background:var(--map-bg);position:relative}
+.wmap svg{width:100%;height:100%;display:block}
+.eta{font-size:1.4em;font-weight:700}
 .copy code{font-family:var(--font);font-size:1.6em;font-weight:700;color:var(--fg);user-select:all}
 /* personas */
 .person{display:flex;align-items:center;gap:12px;background:var(--surface);border-radius:16px;padding:12px 14px}
@@ -519,8 +530,21 @@ button{cursor:pointer}
     <section class="screen" data-s="ayuda" aria-label="Pedido de ayuda enviado" hidden>
       <div class="scroll">
         <div class="card" style="background:var(--help);color:#fff" role="status"><b style="font-size:1.25em">Pediste ayuda</b><span id="helpVia">Enviado a 4 contactos con tu ubicación · 12:05</span><b id="rescueSt" hidden></b><span class="undo-in" data-undo hidden><span data-undo-t>Puedes deshacerlo durante 10 s</span><button type="button">Deshacer</button></span></div>
+        <div class="wait" id="waitBox" aria-live="polite">
+          <div id="wSearch"><div class="row1"><span class="pulse" aria-hidden="true"></span><b>Buscando una unidad de rescate…</b></div><span class="small muted">Tu pedido llegó al portal de Rescate. Aquí te mostramos quién viene apenas lo tomen.</span></div>
+          <div id="wTaken" hidden>
+            <div class="unit"><span class="ic" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16V8h11v8M14 11h4l3 3v2h-7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></span>
+              <div><b id="wTeam">Unidad de rescate</b><br><span class="small muted">viene en camino</span></div></div>
+            <div><span class="eta" id="wEta"></span> <span class="small muted" id="wDist"></span></div>
+            <div class="wmap" id="wMap" role="img" aria-label="Mapa con tu ubicación y la de la unidad"></div>
+            <span class="small muted" id="wNote"></span>
+            <a class="btn sec" id="wGmaps" target="_blank" rel="noopener" style="min-height:44px">Ver en Google Maps</a>
+          </div>
+          <div id="wDone" hidden><b id="wDoneT"></b></div>
+          <div id="wOff" hidden><b>Sin internet: tu pedido salió por SMS.</b><br><span class="small muted">Cuando vuelva la conexión verás aquí quién viene.</span></div>
+        </div>
         <div class="callout"><b>Si hay heridos o atrapados, llama a la línea de emergencias</b>
-          <div class="copy"><code>123</code><button class="btn sec" style="width:auto;min-height:44px" id="copy123">Copiar número</button></div>
+          <a class="btn call123" href="tel:123" id="call123"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>Llamar al 123</a>
           <span class="small muted">Serena no reemplaza la línea 123.</span></div>
         <p class="h2">Mientras llega la ayuda</p>
         <ol class="steps">
@@ -855,7 +879,7 @@ button{cursor:pointer}
     var t=e.target.closest('[data-go]'); if(t){go(t.dataset.go);return}
     if(e.target.closest('[data-sim]')){startSim();return}
     if(e.target.closest('[data-restart]')){boot(true);return}
-    if(e.target.closest('[data-cancel]')){showSnack('Avisamos que ya no necesitas ayuda');setTimeout(function(){go('bien')},50);return}
+    if(e.target.closest('[data-cancel]')){pedido(false);showSnack('Avisamos que ya no necesitas ayuda');setTimeout(function(){go('bien')},50);return}
     var ts=e.target.closest('[data-theme-set]'); if(ts){setTheme(ts.dataset.themeSet);return}
   });
 
@@ -983,22 +1007,53 @@ var nube=(function(){
   };
 })();
 
-  var pedidoId=null;
+  var pedidoId=null, here=null, lmap=null;
+  // ubicación aproximada de la persona (si no da permiso, un punto de ejemplo en Chapinero)
+  function ubicar(cb){var done=false,fb={lat:4.6486,lng:-74.0628,aprox:true};function fin(p){if(!done){done=true;here=p;cb(p)}}
+    setTimeout(function(){fin(fb)},4000);
+    try{navigator.geolocation.getCurrentPosition(function(p){fin({lat:+p.coords.latitude.toFixed(4),lng:+p.coords.longitude.toFixed(4)})},function(){fin(fb)},{enableHighAccuracy:false,timeout:3800,maximumAge:60000})}catch(e){fin(fb)}}
+  function km(a,b){var R=6371,r=Math.PI/180,dl=(b.lat-a.lat)*r,dg=(b.lng-a.lng)*r,x=Math.sin(dl/2)*Math.sin(dl/2)+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dg/2)*Math.sin(dg/2);return 2*R*Math.asin(Math.sqrt(x))}
+  function espera(view){['wSearch','wTaken','wDone','wOff'].forEach(function(id){$(id).hidden=id!==view})}
+  // mapa: OpenStreetMap si hay internet; si no, un radar simple con los dos puntos
+  function drawRadar(u){var el=$('wMap'),d=km(here,u),ex=(u.lng-here.lng)*Math.cos(here.lat*Math.PI/180)*111,ey=-(u.lat-here.lat)*111,
+    n=Math.max(Math.sqrt(ex*ex+ey*ey),1e-6),r=Math.min(68,8+d*45),dx=ex/n*r,dy=ey/n*r;
+    el.innerHTML='<svg viewBox="-100 -90 200 180" preserveAspectRatio="xMidYMid meet"><circle r="80" fill="none" style="stroke:var(--line)" stroke-width="1.5"/><circle r="40" fill="none" style="stroke:var(--line)" stroke-width="1.5"/>'+
+      '<circle r="9" fill="#C42B1C" stroke="#fff" stroke-width="3"/><text y="24" text-anchor="middle" style="font:600 11px Poppins;fill:var(--fg)">Tú</text>'+
+      '<circle cx="'+dx+'" cy="'+dy+'" r="9" fill="#1D4ED8" stroke="#fff" stroke-width="3"/><text x="'+dx+'" y="'+(dy-14)+'" text-anchor="middle" style="font:600 11px Poppins;fill:var(--fg)">Unidad</text></svg>'}
+  function drawMap(u){
+    if(window.L&&lmap){lmap.u.setLatLng([u.lat,u.lng]);lmap.m.fitBounds([[here.lat,here.lng],[u.lat,u.lng]],{padding:[30,30],maxZoom:16});return}
+    drawRadar(u);
+    if(lmap===null&&navigator.onLine&&location.protocol!=='file:'){lmap=false;
+      var c=document.createElement('link');c.rel='stylesheet';c.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';document.head.appendChild(c);
+      var sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+      sc.onload=function(){try{var el=$('wMap');el.innerHTML='';var m=L.map(el,{zoomControl:false,attributionControl:true});
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(m);
+        var dot=function(col){return {radius:9,color:'#fff',weight:3,fillColor:col,fillOpacity:1}};
+        L.circleMarker([here.lat,here.lng],dot('#C42B1C')).addTo(m).bindTooltip('Tú',{permanent:true,direction:'bottom'});
+        lmap={m:m,u:L.circleMarker([u.lat,u.lng],dot('#1D4ED8')).addTo(m).bindTooltip('Unidad',{permanent:true,direction:'top'})};
+        m.fitBounds([[here.lat,here.lng],[u.lat,u.lng]],{padding:[30,30],maxZoom:16})}catch(e){lmap=false}};
+      document.head.appendChild(sc)}}
+  function seguir(v){if(cur!=='ayuda')return;var rs=$('rescueSt');
+    if(v.estado==='camino'){espera('wTaken');$('wTeam').textContent=v.equipo||'Unidad de rescate';
+      if(!rs.textContent){rs.textContent=(v.equipo||'Un equipo')+' tomó tu caso: van en camino.';rs.hidden=false;showSnack(rs.textContent);vibrate([200,100,200])}
+      if(v.unidad&&here){var d=km(here,v.unidad),eta=Math.max(1,Math.round(v.eta!=null?v.eta:d/25*60));
+        $('wEta').textContent=d<0.08?'Ya está llegando':'Llega en '+eta+' min';$('wDist').textContent=d<0.08?'':'a '+(d<1?Math.round(d*1000)+' m':d.toFixed(1).replace('.',',')+' km');
+        $('wNote').textContent='Ubicación en vivo de la unidad'+(v.unidad.sim?' (recorrido simulado para el prototipo)':'')+(here.aprox?'. Tu ubicación es aproximada.':'.');
+        $('wGmaps').href='https://www.google.com/maps/dir/?api=1&origin='+v.unidad.lat+','+v.unidad.lng+'&destination='+here.lat+','+here.lng;drawMap(v.unidad)}
+      else{$('wEta').textContent='Calculando la ruta…';$('wDist').textContent=''}}
+    else if(v.estado==='ok'||v.estado==='rem'){espera('wDone');$('wDoneT').textContent=v.estado==='ok'?'La unidad marcó tu caso como atendido.':'Te remitieron a un hospital. Sigue las indicaciones del equipo.';rs.textContent='';rs.hidden=true}
+    else if(v.estado==='libre')espera('wSearch')}
   function pedido(on){var rs=$('rescueSt');
     try{var K='serena-sos-pedidos',a=JSON.parse(localStorage.getItem(K)||'[]');
-    if(on){pedidoId='p'+Date.now()+Math.random().toString(36).slice(2,6);
+    if(on){pedidoId='p'+Date.now()+Math.random().toString(36).slice(2,6);var id=pedidoId;rs.textContent='';rs.hidden=true;lmap=lmap&&lmap.m?(lmap.m.remove(),null):null;$('wMap').innerHTML='';
+      espera(state.off?'wOff':'wSearch');
       var d={nombre:state.user&&state.user.name||'Laura Gómez',via:state.off?'SMS':'App',salud:'Asma. Usa inhalador.',loc:'Chapinero',estado:'libre',sim:!!state.sim};
-      a.push(Object.assign({id:pedidoId},d));
-      if(!state.off)nube.guardar(pedidoId,Object.assign({creado:true},d)).then(function(ok){if(ok)nube.uno(pedidoId,function(v){
-        if(cur!=='ayuda')return; var t={camino:(v.equipo||'Un equipo')+' tomó tu caso: van en camino.',ok:'Tu caso quedó como atendido.',rem:'Te remitieron a un hospital.'}[v.estado];
-        if(t){rs.textContent=t;rs.hidden=false;showSnack(t)}})});
+      a.push(Object.assign({id:id},d));
+      if(!state.off)ubicar(function(p){if(pedidoId!==id)return;
+        nube.guardar(id,Object.assign({creado:true,lat:p.lat,lng:p.lng},d)).then(function(ok){if(ok&&pedidoId===id)nube.uno(id,function(v){if(pedidoId===id)seguir(v)})})});
     }else{a=a.filter(function(r){return r.id!==pedidoId});if(pedidoId)nube.guardar(pedidoId,{estado:'cancel'});pedidoId=null;rs.hidden=true}
     localStorage.setItem(K,JSON.stringify(a.slice(-5)))}catch(e){}}
   hb.addEventListener('contextmenu',function(e){e.preventDefault()});
-  // copiar 123
-  $('copy123').addEventListener('click',function(){var b=this;function ok(){b.textContent='Copiado'}
-    try{navigator.clipboard.writeText('123').then(ok,function(){selectCode()})}catch(e){selectCode()}
-    function selectCode(){var r=document.createRange();r.selectNodeContents(b.previousElementSibling);var s=getSelection();s.removeAllRanges();s.addRange(r)}});
   // filtro del mapa
   all('.chip').forEach(function(c){c.addEventListener('click',function(){var f=c.dataset.f;
     all('.chip').forEach(function(x){x.setAttribute('aria-pressed',x===c?'true':'false')});
