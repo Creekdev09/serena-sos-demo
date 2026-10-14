@@ -152,7 +152,7 @@ button{cursor:pointer}
 .av.big{width:64px;height:64px;font-size:1.5em;border:2px solid var(--accent)}
 .av svg{width:30px;height:30px}
 .seg3{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--surface2);border-radius:12px;padding:4px}
-.seg3 button{min-height:44px;border-radius:9px;border:0;background:transparent;color:var(--fg);font-size:.85em;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px}
+.seg3 button{min-height:48px;border-radius:9px;border:0;background:transparent;color:var(--fg);font-size:.85em;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px}
 .seg3 button svg{width:18px;height:18px}
 .seg3 button[aria-pressed="true"]{background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.18);outline:2px solid var(--accent);outline-offset:-2px}
 .list{display:flex;flex-direction:column;background:var(--surface);border-radius:16px;overflow:hidden}
@@ -238,7 +238,8 @@ button{cursor:pointer}
 .unit{display:flex;gap:10px;align-items:center}
 .unit .ic{width:44px;height:44px;border-radius:12px;background:#1D4ED8;color:#fff;display:grid;place-items:center;flex:none}
 .wmap{height:190px;border-radius:12px;overflow:hidden;background:var(--map-bg);position:relative}
-.wmap svg{width:100%;height:100%;display:block}
+.wmap>svg{width:100%;height:100%;display:block}
+.wmap .leaflet-tooltip{font:600 12px Poppins,sans-serif;color:#1E1442;padding:2px 8px}
 .eta{font-size:1.4em;font-weight:700}
 .copy code{font-family:var(--font);font-size:1.6em;font-weight:700;color:var(--fg);user-select:all}
 /* personas */
@@ -984,7 +985,7 @@ var nube=(function(){
       '<circle r="9" fill="#C42B1C" stroke="#fff" stroke-width="3"/><text y="24" text-anchor="middle" style="font:600 11px Poppins;fill:var(--fg)">Tú</text>'+
       '<circle cx="'+dx+'" cy="'+dy+'" r="9" fill="#1D4ED8" stroke="#fff" stroke-width="3"/><text x="'+dx+'" y="'+(dy-14)+'" text-anchor="middle" style="font:600 11px Poppins;fill:var(--fg)">Unidad</text></svg>'}
   function drawMap(u){
-    if(window.L&&lmap){lmap.u.setLatLng([u.lat,u.lng]);lmap.m.fitBounds([[here.lat,here.lng],[u.lat,u.lng]],{padding:[30,30],maxZoom:16});return}
+    if(window.L&&lmap){lmap.u.setLatLng([u.lat,u.lng]);lmap.m.fitBounds([[here.lat,here.lng],[u.lat,u.lng]],{padding:[44,44],maxZoom:16});return}
     drawRadar(u);
     if(lmap===null&&navigator.onLine&&location.protocol!=='file:'){lmap=false;
       var c=document.createElement('link');c.rel='stylesheet';c.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';document.head.appendChild(c);
@@ -992,9 +993,9 @@ var nube=(function(){
       sc.onload=function(){try{var el=$('wMap');el.innerHTML='';var m=L.map(el,{zoomControl:false,attributionControl:true});
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(m);
         var dot=function(col){return {radius:9,color:'#fff',weight:3,fillColor:col,fillOpacity:1}};
-        L.circleMarker([here.lat,here.lng],dot('#C42B1C')).addTo(m).bindTooltip('Tú',{permanent:true,direction:'bottom'});
-        lmap={m:m,u:L.circleMarker([u.lat,u.lng],dot('#1D4ED8')).addTo(m).bindTooltip('Unidad',{permanent:true,direction:'top'})};
-        m.fitBounds([[here.lat,here.lng],[u.lat,u.lng]],{padding:[30,30],maxZoom:16})}catch(e){lmap=false}};
+        L.circleMarker([here.lat,here.lng],dot('#C42B1C')).addTo(m).bindTooltip('Tú',{permanent:true,direction:'bottom',offset:[0,10]});
+        lmap={m:m,u:L.circleMarker([u.lat,u.lng],dot('#1D4ED8')).addTo(m).bindTooltip('Unidad',{permanent:true,direction:'top',offset:[0,-10]})};
+        m.fitBounds([[here.lat,here.lng],[u.lat,u.lng]],{padding:[44,44],maxZoom:16})}catch(e){lmap=false}};
       document.head.appendChild(sc)}}
   function seguir(v){if(cur!=='ayuda')return;var rs=$('rescueSt');
     if(v.estado==='camino'){espera('wTaken');$('wTeam').textContent=v.equipo||'Unidad de rescate';
