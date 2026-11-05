@@ -523,6 +523,11 @@ var nube=(function(){
     sumar:function(p,campo,n){return cloud().then(function(d){if(!d)throw {code:'local'};
       var o={};o[campo]=fs.increment(n);return fs.updateDoc(fs.doc(d,p),o).then(function(){return true})})
       .catch(function(e){denied(e);var x=lall()[p];if(!x)return false;var o={};o[campo]=(x[campo]||0)+n;return lset(p,o,true)})},
+    // varias escrituras juntas: o se hacen todas o ninguna. ops = [['poner',ruta,datos], ['quitar',ruta], …]
+    lote:function(ops){function loc(){ops.forEach(function(o){o[0]==='quitar'?ldel(o[1]):lset(o[1],o[2])});return true}
+      return cloud().then(function(d){if(!d)return loc();var b=fs.writeBatch(d);
+        ops.forEach(function(o){o[0]==='quitar'?b.delete(fs.doc(d,o[1])):b.set(fs.doc(d,o[1]),o[2])});
+        return b.commit().then(function(){ops.forEach(function(o){if(o[0]==='quitar')ldel(o[1])});return true})}).catch(function(e){denied(e);return loc()})},
     // escucha un documento; devuelve una función para dejar de escuchar
     escuchar:function(p,cb){var off=null,stop=false;
       function loc(){if(!stop)off=lwatch(function(){cb(lall()[p]||null)})}

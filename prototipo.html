@@ -474,7 +474,7 @@ button{cursor:pointer}
             </div><span class="err" id="cmRolE" hidden></span></fieldset>
             <div class="field"><label for="cmBld">Edificio donde pasas más tiempo <span class="opt">(opcional)</span></label><select id="cmBld"></select></div>
             <div class="cm-share"><b>Qué verá la brigada de <span data-inst>CIDE</span></b>
-              <ul><li>Tu nombre, tu rol y tu edificio.</li><li>Si estás bien o necesitas ayuda, solo durante un simulacro o un sismo.</li><li>Tu ubicación, solo si pides ayuda.</li></ul>
+              <ul><li>Tu nombre, tu rol y tu edificio.</li><li>Si estás bien o necesitas ayuda, solo durante un simulacro o un sismo.</li><li>Tu ubicación, solo si pides ayuda.</li><li>Tu ficha médica, solo si la compartes y pides ayuda.</li></ul>
               <b>Qué no verá</b><ul><li>Tu ubicación el resto del tiempo, tus contactos ni tu historial.</li></ul></div>
             <div class="field"><label class="consent" for="cmOk"><input type="checkbox" id="cmOk" aria-describedby="cmOkE"><span>Acepto compartir estos datos con <span data-inst>CIDE</span> según la Ley 1581 de 2012. Puedo desvincularme cuando quiera.</span></label><span class="err" id="cmOkE" hidden></span></div>
             <div class="field"><label class="consent" for="cmHealth"><input type="checkbox" id="cmHealth"><span>Compartir también mi ficha médica con la brigada, para que sepa cómo ayudarme. <span class="opt">(Opcional)</span></span></label></div>
@@ -1128,6 +1128,11 @@ var nube=(function(){
     sumar:function(p,campo,n){return cloud().then(function(d){if(!d)throw {code:'local'};
       var o={};o[campo]=fs.increment(n);return fs.updateDoc(fs.doc(d,p),o).then(function(){return true})})
       .catch(function(e){denied(e);var x=lall()[p];if(!x)return false;var o={};o[campo]=(x[campo]||0)+n;return lset(p,o,true)})},
+    // varias escrituras juntas: o se hacen todas o ninguna. ops = [['poner',ruta,datos], ['quitar',ruta], …]
+    lote:function(ops){function loc(){ops.forEach(function(o){o[0]==='quitar'?ldel(o[1]):lset(o[1],o[2])});return true}
+      return cloud().then(function(d){if(!d)return loc();var b=fs.writeBatch(d);
+        ops.forEach(function(o){o[0]==='quitar'?b.delete(fs.doc(d,o[1])):b.set(fs.doc(d,o[1]),o[2])});
+        return b.commit().then(function(){ops.forEach(function(o){if(o[0]==='quitar')ldel(o[1])});return true})}).catch(function(e){denied(e);return loc()})},
     // escucha un documento; devuelve una función para dejar de escuchar
     escuchar:function(p,cb){var off=null,stop=false;
       function loc(){if(!stop)off=lwatch(function(){cb(lall()[p]||null)})}
@@ -1259,16 +1264,23 @@ var nube=(function(){
       var b=$('cmLinkBtn');b.disabled=true;b.textContent='Vinculando…';
       var mid='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),inst=pend.c.inst;
       var d={nombre:nm.value.trim().slice(0,60),rol:r.value,edificio:$('cmBld').value,salud:$('cmHealth').checked?'Asma. Usa inhalador.':'',creado:Date.now(),codigo:pend.code};
-      nube.escribir('instituciones/'+inst+'/miembros/'+mid,d).then(function(){
+      // llave privada: solo este celular la conoce, y sin ella nadie más puede borrarte de la lista
+      var k=llave(),base='instituciones/'+inst+'/';
+      nube.lote([['poner',base+'miembros/'+mid,d],['poner',base+'llaves/'+mid,{k:k}]]).then(function(){
         nube.sumar('codigos/'+pend.code,'usos',1);
         // un simulacro que ya iba en curso al vincularte no te salta encima
-        me={mid:mid,inst:inst,instNombre:pend.i.nombre||pend.c.instNombre,nombre:d.nombre,rol:d.rol,edificio:d.edificio,salud:d.salud,codigo:pend.code,visto:pend.i.evento||null};
+        me={mid:mid,k:k,inst:inst,instNombre:pend.i.nombre||pend.c.instNombre,nombre:d.nombre,rol:d.rol,edificio:d.edificio,salud:d.salud,codigo:pend.code,visto:pend.i.evento||null};
         keep();pend=null;b.disabled=false;b.textContent='Vincularme';render();escuchar();
         showSnack('Listo: quedaste vinculado a '+me.instNombre+'.');
         var h=$('cmLinkedT'),sc=document.querySelector('.screen[data-s="campus"] .scroll');if(sc)sc.scrollTop=0;try{h.focus({preventScroll:true})}catch(x){}
       });
     }
-    function desvincular(){if(!me)return;var n=me.instNombre;nube.borrar('instituciones/'+me.inst+'/miembros/'+me.mid);
+    function llave(){var a=new Uint8Array(18);try{crypto.getRandomValues(a)}catch(e){for(var i=0;i<a.length;i++)a[i]=Math.random()*256|0}
+      return Array.prototype.map.call(a,function(x){return ('0'+x.toString(16)).slice(-2)}).join('')}
+    function desvincular(){if(!me)return;var n=me.instNombre,base='instituciones/'+me.inst+'/';
+      // la baja lleva la llave; las reglas solo dejan borrar a la persona si coincide con la que se guardó al vincularse
+      if(me.k)nube.lote([['poner',base+'bajas/'+me.mid,{k:me.k,hora:Date.now()}],['quitar',base+'miembros/'+me.mid]]);
+      else nube.borrar(base+'miembros/'+me.mid);
       me=null;keep();parar();$('cmCode').value='';render();showSnack('Te desvinculaste de '+n+'.')}
     /* simulacros que lanza la institución */
     function parar(){if(offI)offI();if(offE)offE();offI=offE=null;evId=null;ev=null;modoEv(false)}
